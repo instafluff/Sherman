@@ -1,0 +1,90 @@
+{% extends 'layout.twig' %}
+
+{% block body %}
+	<div id="vote-wrapper" class="vote-wrapper" style="background-color: #2C3037">
+		<div class="container"> <!--page container -->
+    	<div id="subtitles" class="text-box">
+			</div> <!--text box which will contain spoken text -->
+		</div>
+  </div>
+	</div>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/annyang/2.6.0/annyang.min.js"></script>
+	<script>
+		var client = null;
+		var words = [];
+		var author = [];
+		var isEditing = true;
+		var isSpeaking = false;
+		var voices = window.speechSynthesis.getVoices();
+
+		$( document ).ready(function() {
+			setTimeout(() => {
+				voices = window.speechSynthesis.getVoices();
+				console.log( voices );
+			}, 2000 );
+
+			if (annyang) {
+			  // Start listening. You can call this here, or attach this call to an event, button, etc.
+			  annyang.start({ autoRestart: true, continuous: false });
+				console.log("Started Voice Commands");
+			  annyang.addCommands({
+					'type in chat *message': function(message) {
+						client.say("#{{ username }}", message);
+					},
+					'comfy': function() {
+						client.say("#{{ username }}", "!comfy");
+					},
+					'boing boing': function() {
+						client.say("#{{ username }}", "!boingboing");
+					}
+				});
+				annyang.addCallback('result', function(phrases) {
+					$("#subtitles").text(phrases[0]);
+				  console.log("I think the user said: ", phrases[0]);
+				  console.log("But then again, it could be any of the following: ", phrases);
+				});
+			}
+
+			var options = {
+				options: {
+					debug: false
+				},
+				connection: {
+					reconnect: true,
+				},
+				identity: {
+					username: "{{ username }}",
+				    password: "{{ oauth }}"
+				},
+				channels: ["#{{ username }}"]
+			};
+
+			client = new tmi.client(options);
+
+			// Connect the client to the server..
+			client.connect();
+
+			client.on("chat", function (channel, userstate, message, self) {
+				// if( ( userstate[ "badges" ] && ( userstate[ "badges" ][ "vip" ] || userstate[ "badges" ][ "moderator" ] ) ) && message.startsWith( "!speak " ) ) {
+				if( message.startsWith( "!speak " ) ) {
+					var msg = new SpeechSynthesisUtterance();
+					msg.voice = voices[9]; // Note: some voices don't support altering params
+					// msg.voiceURI = 'native';
+					msg.volume = 0.75; // 0 to 1
+					msg.rate = 1; // 0.1 to 10
+					msg.pitch = 1; //0 to 2
+					msg.text = message.replace( "!speak ", "" ).substring(0, 50);
+					msg.lang = 'en-US';
+
+					msg.onend = function(e) {
+						isSpeaking = false;
+					  // console.log('Finished in ' + e.elapsedTime + ' seconds.');
+					};
+					if( !isSpeaking ) {
+						speechSynthesis.speak(msg);
+					}
+				}
+			});
+		});
+	</script>
+{% endblock %}
