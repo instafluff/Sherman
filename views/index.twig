@@ -16,6 +16,27 @@
 		var isEditing = true;
 		var isSpeaking = false;
 		var voices = window.speechSynthesis.getVoices();
+		var subtitleText = null;
+		var openweatherkey = "{{ openweatherkey }}";
+
+		function shermanSays( message ) {
+			var msg = new SpeechSynthesisUtterance();
+			msg.voice = voices[6]; // Note: some voices don't support altering params
+			// msg.voiceURI = 'native';
+			msg.volume = 0.75; // 0 to 1
+			msg.rate = 1; // 0.1 to 10
+			msg.pitch = 1; //0 to 2
+			msg.text = message;
+			msg.lang = 'en-US';
+
+			msg.onend = function(e) {
+				isSpeaking = false;
+				// console.log('Finished in ' + e.elapsedTime + ' seconds.');
+			};
+			if( !isSpeaking ) {
+				speechSynthesis.speak(msg);
+			}
+		}
 
 		$( document ).ready(function() {
 			setTimeout(() => {
@@ -26,20 +47,51 @@
 			if (annyang) {
 			  // Start listening. You can call this here, or attach this call to an event, button, etc.
 			  annyang.start({ autoRestart: true, continuous: false });
+				// annyang.setLanguage("es-MX");
 				console.log("Started Voice Commands");
 			  annyang.addCommands({
 					'type in chat *message': function(message) {
 						client.say("#{{ username }}", message);
 					},
+					'hey sherman *command': function(command) {
+						// shermanSays("did you say " + command);
+						console.log("COMMAND:", command);
+						if( command.startsWith( "tell me the weather " ) ) {
+							var cityName = command.replace("tell me the weather in ", ""); //command.split(" ").pop();
+							$.ajax({
+								url: "https://api.openweathermap.org/data/2.5/weather?q=" + cityName + "&appid=" + openweatherkey,
+								success: (result) => {
+									shermanSays( "The weather in " + result[ "name" ] + " is " + result[ "weather" ][0].description );
+									console.log( result );
+								}
+							});
+						}
+					},
 					'comfy': function() {
+						shermanSays("Okay.");
 						client.say("#{{ username }}", "!comfy");
 					},
 					'boing boing': function() {
+						shermanSays("Okay.");
 						client.say("#{{ username }}", "!boingboing");
-					}
+					},
+					'holy cow': function() {
+						shermanSays("Holy cows live in India");
+					},
+				});
+				annyang.addCallback('soundstart', function() {
+				  console.log('sound detected');
 				});
 				annyang.addCallback('result', function(phrases) {
-					$("#subtitles").text(phrases[0]);
+					if( subtitleText ) {
+						subtitleText.fadeOut(250, () => {
+							subtitleText.remove();
+							subtitleText = $("<p>" + phrases[0] + "</p>").appendTo( "#subtitles" );
+						});
+					}
+					else {
+						subtitleText = $("<p>" + phrases[0] + "</p>").appendTo( "#subtitles" );
+					}
 				  console.log("I think the user said: ", phrases[0]);
 				  console.log("But then again, it could be any of the following: ", phrases);
 				});
@@ -67,23 +119,19 @@
 			client.on("chat", function (channel, userstate, message, self) {
 				// if( ( userstate[ "badges" ] && ( userstate[ "badges" ][ "vip" ] || userstate[ "badges" ][ "moderator" ] ) ) && message.startsWith( "!speak " ) ) {
 				if( message.startsWith( "!speak " ) ) {
-					var msg = new SpeechSynthesisUtterance();
-					msg.voice = voices[9]; // Note: some voices don't support altering params
-					// msg.voiceURI = 'native';
-					msg.volume = 0.75; // 0 to 1
-					msg.rate = 1; // 0.1 to 10
-					msg.pitch = 1; //0 to 2
-					msg.text = message.replace( "!speak ", "" ).substring(0, 50);
-					msg.lang = 'en-US';
-
-					msg.onend = function(e) {
-						isSpeaking = false;
-					  // console.log('Finished in ' + e.elapsedTime + ' seconds.');
-					};
-					if( !isSpeaking ) {
-						speechSynthesis.speak(msg);
-					}
+					shermanSays( message.replace( "!speak ", "" ).substring(0, 50) );
 				}
+
+				// if( message.startsWith( "!weather " ) ) {
+				// 	var cityName = message.replace( "!weather ", "" );
+				// 	$.ajax({
+				// 		url: "https://api.openweathermap.org/data/2.5/weather?q=" + cityName + "&appid=" + openweatherkey,
+				// 		success: (result) => {
+				// 			shermanSays( "The weather in " + result[ "name" ] + " is " + result[ "weather" ][0].description );
+				// 			console.log( result );
+				// 		}
+				// 	});
+				// }
 			});
 		});
 	</script>
