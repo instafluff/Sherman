@@ -38,6 +38,28 @@
 			}
 		}
 
+		function shermanCommand(command) {
+			// shermanSays("did you say " + command);
+			console.log("COMMAND:", command);
+			if( command.includes( "this cord" ) || command.includes( "Discord" ) ) {
+				shermanSays( "Come and hang out with us outside of stream as well!" );
+				client.say( "#{{ username }}", "!discord" );
+			}
+			if( command.includes( "how's it going" ) || command.includes( "how is it going" ) ) {
+				shermanSays( "I have a little code. How are you?" );
+			}
+			if( command.startsWith( "tell me the weather " ) ) {
+				var cityName = command.replace("tell me the weather in ", ""); //command.split(" ").pop();
+				$.ajax({
+					url: "https://api.openweathermap.org/data/2.5/weather?q=" + cityName + "&appid=" + openweatherkey,
+					success: (result) => {
+						shermanSays( "The weather in " + result[ "name" ] + " is " + result[ "weather" ][0].description );
+						console.log( result );
+					}
+				});
+			}
+		}
+
 		$( document ).ready(function() {
 			setTimeout(() => {
 				voices = window.speechSynthesis.getVoices();
@@ -53,20 +75,8 @@
 					'type in chat *message': function(message) {
 						client.say("#{{ username }}", message);
 					},
-					'hey sherman *command': function(command) {
-						// shermanSays("did you say " + command);
-						console.log("COMMAND:", command);
-						if( command.startsWith( "tell me the weather " ) ) {
-							var cityName = command.replace("tell me the weather in ", ""); //command.split(" ").pop();
-							$.ajax({
-								url: "https://api.openweathermap.org/data/2.5/weather?q=" + cityName + "&appid=" + openweatherkey,
-								success: (result) => {
-									shermanSays( "The weather in " + result[ "name" ] + " is " + result[ "weather" ][0].description );
-									console.log( result );
-								}
-							});
-						}
-					},
+					'fisherman *command': shermanCommand,
+					'hey sherman *command': shermanCommand,
 					'comfy': function() {
 						shermanSays("Okay.");
 						client.say("#{{ username }}", "!comfy");
