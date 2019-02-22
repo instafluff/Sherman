@@ -12,6 +12,7 @@
     "express": "~4.16.0",
     "http-errors": "~1.6.2",
     "morgan": "~1.9.0",
+    "parse-duration": "^0.1.1",
     "twig": "~0.10.3",
     "wordpos": "^1.2.0"
   }

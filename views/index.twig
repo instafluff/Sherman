@@ -4,20 +4,74 @@
 	<div id="vote-wrapper" class="vote-wrapper" style="background-color: #2C3037">
 		<div class="container"> <!--page container -->
     	<div id="subtitles" class="text-box">
+				<div id="sherman">
+					<img id="sherman-face" src="images/default.png" width="200">
+				</div>
 			</div> <!--text box which will contain spoken text -->
 		</div>
   </div>
 	</div>
 	<script src="//cdnjs.cloudflare.com/ajax/libs/annyang/2.6.0/annyang.min.js"></script>
+	<script src="https://unpkg.com/compromise@latest/builds/compromise.min.js"></script>
 	<script>
-		var client = null;
-		var words = [];
-		var author = [];
-		var isEditing = true;
-		var isSpeaking = false;
-		var voices = window.speechSynthesis.getVoices();
-		var subtitleText = null;
-		var openweatherkey = "{{ openweatherkey }}";
+		let client = null;
+		let words = [];
+		let author = [];
+		let isEditing = true;
+		let isSpeaking = false;
+		let voices = window.speechSynthesis.getVoices();
+		let subtitleText = null;
+		let openweatherkey = "{{ openweatherkey }}";
+		let shermanFaces = [ "images/default.png", "images/talk.png", "images/talk1.png" ];
+		let currentShermanFace = 0;
+
+		var shermanAnimate = setInterval( () => {
+			if( isSpeaking ) {
+				currentShermanFace = currentShermanFace > 1 ? 1 : 2;
+			}
+			else {
+				currentShermanFace = 0;
+			}
+			$("#sherman-face").attr("src", shermanFaces[ currentShermanFace ] );
+		}, 200 );
+
+		var speechUtteranceChunker = function (utt, settings, callback) {
+			settings = settings || {};
+			var chunkLength = settings && settings.chunkLength || 160;
+			var pattRegex = new RegExp('^.{' + Math.floor(chunkLength / 2) + ',' + chunkLength + '}[\.\!\?\,]{1}|^.{1,' + chunkLength + '}$|^.{1,' + chunkLength + '} ');
+			var txt = (settings && settings.offset !== undefined ? utt.text.substring(settings.offset) : utt.text);
+			var chunkArr = txt.match(pattRegex);
+
+			if (chunkArr[0] !== undefined && chunkArr[0].length > 2) {
+				var chunk = chunkArr[0];
+				var newUtt = new SpeechSynthesisUtterance(chunk);
+				newUtt.voice = voices[6]; // Note: some voices don't support altering params
+				newUtt.volume = 0.75; // 0 to 1
+				newUtt.rate = 1; // 0.1 to 10
+				newUtt.pitch = 1; //0 to 2
+				newUtt.lang = 'en-US';
+				for (x in utt) {
+					if (utt.hasOwnProperty(x) && x !== 'text') {
+						newUtt[x] = utt[x];
+					}
+				}
+				newUtt.onend = function () {
+					settings.offset = settings.offset || 0;
+					settings.offset += chunk.length - 1;
+					speechUtteranceChunker(utt, settings, callback);
+				}
+				console.log(newUtt); //IMPORTANT!! Do not remove: Logging the object out fixes some onend firing issues.
+				//placing the speak invocation inside a callback fixes ordering and onend issues.
+				setTimeout(function () {
+					speechSynthesis.speak(newUtt);
+				}, 0);
+			} else {
+				//call once all text has been spoken...
+				if (callback !== undefined) {
+					callback();
+				}
+			}
+		}
 
 		function shermanSays( message ) {
 			var msg = new SpeechSynthesisUtterance();
@@ -29,34 +83,145 @@
 			msg.text = message;
 			msg.lang = 'en-US';
 
-			msg.onend = function(e) {
-				isSpeaking = false;
-				// console.log('Finished in ' + e.elapsedTime + ' seconds.');
-			};
 			if( !isSpeaking ) {
-				speechSynthesis.speak(msg);
+				isSpeaking = true;
+				// speechSynthesis.speak(msg);
+				speechUtteranceChunker(msg, { chunkLength:180 }, function(){
+					//some code to execute when done
+					console.log('done');
+					isSpeaking = false;
+				});
 			}
+		}
+
+		function shermanParseDuration(text) {
+			var result = 0;
+			var duration = /(-?\d*\.?\d+(?:e[-+]?\d+)?)\s*([a-zμ]*)/ig;
+			// ignore commas
+  		text = text.replace(/(\d),(\d)/g, '$1$2')
+  		text.replace(duration, function(_, n, units){
+		    result += moment.duration(parseFloat(n, 10), units.toLowerCase());
+		  });
+			return result;
+		}
+
+		function shermanReminder(text) {
+			var ms = shermanParseDuration( text );
+			shermanSays( "Okay, I will remind you" );
+			setTimeout(() => {
+				shermanSays( "Reminder alert BEEP BOOP for " + text );
+				client.say( "#{{ username }}", "Reminde alert BEEP BOOP for " + text );
+			}, ms );
+		}
+
+		function shermanKnowitall(topic) {
+			$.ajax({
+				url: "https://api.duckduckgo.com/?q=" + topic + "&format=json",
+				success: (result) => {
+					var parsedResult = JSON.parse( result );
+					if( parsedResult[ "Abstract" ] ) {
+						shermanSays( parsedResult[ "Abstract" ] );
+						console.log( parsedResult[ "Abstract" ] );
+					}
+					else {
+						shermanSays( "Sorry, I could not find anythng about " + topic );
+					}
+				}
+			});
+		}
+
+		function shermanWeather(city) {
+			$.ajax({
+				url: "https://api.openweathermap.org/data/2.5/weather?q=" + city + "&appid=" + openweatherkey,
+				success: (result) => {
+					var tempCelsius = result[ "main" ].temp - 273.15;
+					var tempFahrenheit = tempCelsius * 9 / 5 + 32;
+					shermanSays( "The weather in " + result[ "name" ] + " is " + result[ "weather" ][0].description + " and is " + Math.round(tempCelsius) + " degrees celsius or " + Math.round(tempFahrenheit) + " degrees fahrenheit" );
+					console.log( result );
+				}
+			});
+		}
+
+		function getCORS(url, success) {
+			var xhr = new XMLHttpRequest();
+			if (!('withCredentials' in xhr)) xhr = new XDomainRequest(); // fix IE8/9
+			xhr.open('GET', url);
+			xhr.setRequestHeader("Accept", "application/json");
+			xhr.onload = success;
+			xhr.send();
+			return xhr;
+		}
+
+		function shermanDadjoke(term = "") {
+			getCORS( term ? 'https://icanhazdadjoke.com/search?term=' + term : 'https://icanhazdadjoke.com', function(request){
+				var response = request.currentTarget.response || request.target.responseText;
+				var jokes = JSON.parse( response );
+				console.log(jokes);
+				if( jokes.joke ) {
+					shermanSays( jokes.joke );
+				}
+				else if( jokes.results && jokes.results.length > 0 ) {
+					shermanSays( jokes.results[ 0 ].joke );
+				}
+				else {
+					shermanSays( "Sorry, I don't know any jokes about " + term );
+				}
+			});
 		}
 
 		function shermanCommand(command) {
 			// shermanSays("did you say " + command);
 			console.log("COMMAND:", command);
+			let commandNlp = nlp(command);
+			var parsed = "";
 			if( command.includes( "this cord" ) || command.includes( "Discord" ) ) {
 				shermanSays( "Come and hang out with us outside of stream as well!" );
 				client.say( "#{{ username }}", "!discord" );
 			}
-			if( command.includes( "how's it going" ) || command.includes( "how is it going" ) ) {
+			else if( parsed = commandNlp.clauses().if('remind me in').out() ) {
+				var reminder = parsed.replace("remind me in ", "");
+				shermanReminder( reminder );
+			}
+			else if( command.includes( "GitHub" ) ) {
+				shermanSays( "The projects we work on are available open-source on the Instafluff Github!" );
+				client.say( "#{{ username }}", "!github" );
+			}
+			else if( command.includes( "how's it going" ) || command.includes( "how is it going" ) ) {
 				shermanSays( "I have a little code. How are you?" );
 			}
-			if( command.startsWith( "tell me the weather " ) ) {
-				var cityName = command.replace("tell me the weather in ", ""); //command.split(" ").pop();
-				$.ajax({
-					url: "https://api.openweathermap.org/data/2.5/weather?q=" + cityName + "&appid=" + openweatherkey,
-					success: (result) => {
-						shermanSays( "The weather in " + result[ "name" ] + " is " + result[ "weather" ][0].description );
-						console.log( result );
-					}
-				});
+			else if( parsed = commandNlp.clauses().if('tell #Noun the weather').out() ) {
+				var matchPhrase = commandNlp.match('tell #Noun the weather in ').out().trim();
+				var cityName = parsed.substring( parsed.indexOf( matchPhrase ) + matchPhrase.length );
+				shermanWeather( cityName );
+			}
+			else if( command.startsWith( "how much is that doggy" ) ) {
+				shermanSays( "the one with the waggly tail, I will add it to your basket" );
+			}
+			else if( parsed = commandNlp.clauses().if('tell #Noun about').out() ) {
+				var matchPhrase = commandNlp.match('tell #Noun about ').out().trim();
+				var query = parsed.substring( parsed.indexOf( matchPhrase ) + matchPhrase.length );
+				shermanKnowitall( query );
+			}
+			else if( parsed = commandNlp.clauses().if('what is').out() ) {
+				var matchPhrase = commandNlp.match('what is ').out().trim();
+				var query = parsed.substring( parsed.indexOf( matchPhrase ) + matchPhrase.length );
+				shermanKnowitall( query );
+			}
+			else if( parsed = commandNlp.clauses().if('tell #Noun a joke about').out() ) {
+				var matchPhrase = commandNlp.match('tell #Noun a joke about ').out().trim();
+				var topic = parsed.substring( parsed.indexOf( matchPhrase ) + matchPhrase.length );
+				shermanDadjoke( topic );
+			}
+			else if( parsed = commandNlp.clauses().if('tell #Noun a joke').out() ) {
+				shermanDadjoke();
+			}
+		}
+
+		function detectShermanCommand( text, phrase ) {
+			let commandIndex = text.indexOf( phrase );
+			if( commandIndex > 0 ) {
+				// sherman command is within a bunch of text!
+				shermanCommand( text.substring( commandIndex ).replace( phrase, "" ).trim() );
 			}
 		}
 
@@ -93,6 +258,12 @@
 				  console.log('sound detected');
 				});
 				annyang.addCallback('result', function(phrases) {
+					// "hey Sherman","he Sherman","a Sherman"/"fisherman"
+					detectShermanCommand( phrases[ 0 ], "hey Sherman" );
+					detectShermanCommand( phrases[ 0 ], "a Sherman" );
+					detectShermanCommand( phrases[ 0 ], "he Sherman" );
+					detectShermanCommand( phrases[ 0 ], "hay Sherman" );
+					// detectShermanCommand( phrases[ 0 ], "fisherman" );
 					if( subtitleText ) {
 						subtitleText.fadeOut(250, () => {
 							subtitleText.remove();
@@ -129,7 +300,7 @@
 			client.on("chat", function (channel, userstate, message, self) {
 				// if( ( userstate[ "badges" ] && ( userstate[ "badges" ][ "vip" ] || userstate[ "badges" ][ "moderator" ] ) ) && message.startsWith( "!speak " ) ) {
 				if( message.startsWith( "!speak " ) ) {
-					shermanSays( message.replace( "!speak ", "" ).substring(0, 50) );
+					shermanSays( message.replace( "!speak ", "" ).substring(0, 100) );
 				}
 
 				// if( message.startsWith( "!weather " ) ) {
