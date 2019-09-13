@@ -9,6 +9,15 @@ We built this voice command bot live on Twitch!
 
 > https://twitter.com/instafluffTV
 
+## Using Microsoft Azure LUIS for Language Understanding ##
+
+To use LUIS with Sherman,
+1. Visit [https://www.luis.ai](https://www.luis.ai) and log in for free
+2. Create an app and add the various Intents and Entities you would like Sherman to recognize
+3. Under the MANAGE tab, copy the `Primary key` and add it into your `.env` file as `AzureLUISPrimaryKey=YOURKEYHERE`
+
+Special thank you to the Microsoft Azure team for enabling these upgrades to Sherman during a sponsored Instafluff stream (Sep 12, 2019)!
+
 ## Credits ##
 Thank you too all the participants of this project!
 

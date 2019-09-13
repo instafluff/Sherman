@@ -1,7 +1,7 @@
 {% extends 'layout.twig' %}
 
 {% block body %}
-	<div id="vote-wrapper" class="vote-wrapper" style="background-color: #2C3037">
+	<div id="vote-wrapper" class="vote-wrapper">
 		<div class="container"> <!--page container -->
     	<div id="subtitles" class="text-box">
 				<div id="sherman">
@@ -21,6 +21,7 @@
 		let isSpeaking = false;
 		let voices = window.speechSynthesis.getVoices();
 		let subtitleText = null;
+		let azureEndpoint = "https://westus.api.cognitive.microsoft.com/luis/v2.0/apps/0ea575b0-9a48-4898-a49f-21ce0e8d37d1?verbose=true&timezoneOffset=0&subscription-key={{ azureluiskey }}&q=";
 		let openweatherkey = "{{ openweatherkey }}";
 		let shermanFaces = [ "images/default.png", "images/talk.png", "images/talk1.png" ];
 		let currentShermanFace = 0;
@@ -42,7 +43,7 @@
 			var txt = (settings && settings.offset !== undefined ? utt.text.substring(settings.offset) : utt.text);
 			var chunkArr = txt.match(pattRegex);
 
-			if (chunkArr[0] !== undefined && chunkArr[0].length > 2) {
+			if ( chunkArr && chunkArr[0] !== undefined && chunkArr[0].length > 2) {
 				var chunk = chunkArr[0];
 				var newUtt = new SpeechSynthesisUtterance(chunk);
 				newUtt.voice = voices[6]; // Note: some voices don't support altering params
@@ -110,8 +111,28 @@
 			shermanSays( "Okay, I will remind you" );
 			setTimeout(() => {
 				shermanSays( "Reminder alert BEEP BOOP for " + text );
-				client.say( "#{{ username }}", "Reminde alert BEEP BOOP for " + text );
+				client.say( "#{{ username }}", "Reminder alert BEEP BOOP for " + text );
 			}, ms );
+		}
+
+		function shermanPizza() {
+			shermanSays( "pineapple belongs on pizza come at me bro" );
+		}
+
+		function shermanDefineItAll( word ) {
+			$.ajax({
+				url: `https://www.instafluff.tv/ComfyDictionary/web/${word}.json`,
+				success: (result) => {
+					console.log( result );
+					if( result[ "definition" ] ) {
+						shermanSays( result[ "definition" ] );
+						console.log( result[ "definition" ] );
+					}
+					else {
+						shermanSays( "Sorry, I could not find the word " + word );
+					}
+				}
+			});
 		}
 
 		function shermanKnowitall(topic) {
@@ -124,7 +145,7 @@
 						console.log( parsedResult[ "Abstract" ] );
 					}
 					else {
-						shermanSays( "Sorry, I could not find anythng about " + topic );
+						shermanSays( "Sorry, I could not find anything about " + topic );
 					}
 				}
 			});
@@ -161,12 +182,61 @@
 					shermanSays( jokes.joke );
 				}
 				else if( jokes.results && jokes.results.length > 0 ) {
-					shermanSays( jokes.results[ 0 ].joke );
+					shermanSays( jokes.results[ 0 ].joke.replace( /↵/g, " " ).replace( /\n/g, " " ) );
 				}
 				else {
 					shermanSays( "Sorry, I don't know any jokes about " + term );
 				}
 			});
+		}
+
+		async function shermanCatFact() {
+			getCORS( "https://cors-anywhere.herokuapp.com/https://cat-fact.herokuapp.com/facts/random", function(request){
+				var response = request.currentTarget.response || request.target.responseText;
+				var fact = JSON.parse( response );
+				if( fact.text ) {
+					shermanSays( fact.text );
+				}
+				else {
+					shermanSays( "Sorry, I have no cat facts right meow." );
+				}
+			});
+		}
+
+		function shermanAzureIntent( command ) {
+			console.log( "Command:", command );
+			if( command ) {
+				$.ajax({
+					url: azureEndpoint + command,
+					success: (result) => {
+						console.log( "RESULT:", result );
+						switch( result.topScoringIntent.intent ) {
+							case "Dictionary":
+								if( result.entities.length > 0 ) {
+									shermanDefineItAll( result.entities[ 0 ].entity.split( " " ).pop() );
+								}
+								break;
+							case "Weather.CheckWeatherValue":
+								if( result.entities.length > 0 ) {
+									shermanWeather( result.entities[ 0 ].entity );
+								}
+								break;
+							case "ToDo.AddToDo":
+								shermanReminder( command );
+								break;
+							case "Dad Joke":
+								shermanDadjoke();
+								break;
+							case "Pizza":
+								shermanPizza();
+								break;
+							case "CatFact":
+								shermanCatFact();
+								break;
+						}
+					}
+				});
+			}
 		}
 
 		function shermanCommand(command) {
@@ -217,12 +287,21 @@
 			}
 		}
 
-		function detectShermanCommand( text, phrase ) {
-			let commandIndex = text.indexOf( phrase );
-			if( commandIndex > 0 ) {
-				// sherman command is within a bunch of text!
-				shermanCommand( text.substring( commandIndex ).replace( phrase, "" ).trim() );
+		function detectShermanCommand( texts, phrases ) {
+			for( var i = 0; i < texts.length; i++ ) {
+				var text = texts[ i ];
+				var phrase = phrases.find( p => text.indexOf( p ) !== -1 );
+				if( phrase ) {
+					let commandIndex = text.indexOf( phrase );
+					if( commandIndex !== -1 ) {
+						// sherman command is within a bunch of text!
+						// shermanCommand( text.substring( commandIndex ).replace( phrase, "" ).trim() );
+						shermanAzureIntent( text.substring( commandIndex ).replace( phrase, "" ).trim() );
+						return true;
+					}
+				}
 			}
+			return false;
 		}
 
 		$( document ).ready(function() {
@@ -237,18 +316,24 @@
 				// annyang.setLanguage("es-MX");
 				console.log("Started Voice Commands");
 			  annyang.addCommands({
-					'type in chat *message': function(message) {
-						client.say("#{{ username }}", message);
+					// 'type in chat *message': function(message) {
+					// 	client.say("#{{ username }}", message);
+					// },
+					// 'fisherman *command': shermanAzureIntent,
+					// 'hey sherman *command': shermanAzureIntent,
+					// 'comfy': function() {
+					// 	shermanSays("Okay.");
+					// 	client.say("#{{ username }}", "!comfy");
+					// },
+					// 'boing boing': function() {
+					// 	shermanSays("Okay.");
+					// 	client.say("#{{ username }}", "!boingboing");
+					// },
+					'holy cram': function() {
+						shermanSays("Holy cows live in India");
 					},
-					'fisherman *command': shermanCommand,
-					'hey sherman *command': shermanCommand,
-					'comfy': function() {
-						shermanSays("Okay.");
-						client.say("#{{ username }}", "!comfy");
-					},
-					'boing boing': function() {
-						shermanSays("Okay.");
-						client.say("#{{ username }}", "!boingboing");
+					'holy crap': function() {
+						shermanSays("Holy cows live in India");
 					},
 					'holy cow': function() {
 						shermanSays("Holy cows live in India");
@@ -259,11 +344,6 @@
 				});
 				annyang.addCallback('result', function(phrases) {
 					// "hey Sherman","he Sherman","a Sherman"/"fisherman"
-					detectShermanCommand( phrases[ 0 ], "hey Sherman" );
-					detectShermanCommand( phrases[ 0 ], "a Sherman" );
-					detectShermanCommand( phrases[ 0 ], "he Sherman" );
-					detectShermanCommand( phrases[ 0 ], "hay Sherman" );
-					// detectShermanCommand( phrases[ 0 ], "fisherman" );
 					if( subtitleText ) {
 						subtitleText.fadeOut(250, () => {
 							subtitleText.remove();
@@ -273,8 +353,11 @@
 					else {
 						subtitleText = $("<p>" + phrases[0] + "</p>").appendTo( "#subtitles" );
 					}
-				  console.log("I think the user said: ", phrases[0]);
+				  console.log("I think the user said:", phrases[0]);
 				  console.log("But then again, it could be any of the following: ", phrases);
+					detectShermanCommand( phrases,
+						[ "hey Sherman", "a Sherman", "he Sherman", "hay Sherman", "Sherman", "fisherman" ]
+						);
 				});
 			}
 
