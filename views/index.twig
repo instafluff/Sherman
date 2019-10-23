@@ -14,7 +14,6 @@
 	<script src="//cdnjs.cloudflare.com/ajax/libs/annyang/2.6.0/annyang.min.js"></script>
 	<script src="https://unpkg.com/compromise@latest/builds/compromise.min.js"></script>
 	<script>
-		let client = null;
 		let words = [];
 		let author = [];
 		let isEditing = true;
@@ -81,7 +80,7 @@
 			msg.volume = 0.75; // 0 to 1
 			msg.rate = 1; // 0.1 to 10
 			msg.pitch = 1; //0 to 2
-			msg.text = message;
+			msg.text = message.replace(/[^\w\s]/gi, '');
 			msg.lang = 'en-US';
 
 			if( !isSpeaking ) {
@@ -108,11 +107,13 @@
 
 		function shermanReminder(text) {
 			var ms = shermanParseDuration( text );
-			shermanSays( "Okay, I will remind you" );
-			setTimeout(() => {
-				shermanSays( "Reminder alert BEEP BOOP for " + text );
-				client.say( "#{{ username }}", "Reminder alert BEEP BOOP for " + text );
-			}, ms );
+			if( ms ) {
+				shermanSays( "Okay, I will remind you" );
+				setTimeout(() => {
+					shermanSays( "Reminder alert BEEP BOOP for " + text );
+					ComfyJS.Say( "Reminder alert BEEP BOOP for " + text );
+				}, ms );
+			}
 		}
 
 		function shermanPizza() {
@@ -246,7 +247,7 @@
 			var parsed = "";
 			if( command.includes( "this cord" ) || command.includes( "Discord" ) ) {
 				shermanSays( "Come and hang out with us outside of stream as well!" );
-				client.say( "#{{ username }}", "!discord" );
+				ComfyJS.Say( "!discord" );
 			}
 			else if( parsed = commandNlp.clauses().if('remind me in').out() ) {
 				var reminder = parsed.replace("remind me in ", "");
@@ -254,7 +255,7 @@
 			}
 			else if( command.includes( "GitHub" ) ) {
 				shermanSays( "The projects we work on are available open-source on the Instafluff Github!" );
-				client.say( "#{{ username }}", "!github" );
+				ComfyJS.Say( "!github" );
 			}
 			else if( command.includes( "how's it going" ) || command.includes( "how is it going" ) ) {
 				shermanSays( "I have a little code. How are you?" );
@@ -317,17 +318,17 @@
 				console.log("Started Voice Commands");
 			  annyang.addCommands({
 					// 'type in chat *message': function(message) {
-					// 	client.say("#{{ username }}", message);
+					// 	ComfyJS.Say( message);
 					// },
 					// 'fisherman *command': shermanAzureIntent,
 					// 'hey sherman *command': shermanAzureIntent,
 					// 'comfy': function() {
 					// 	shermanSays("Okay.");
-					// 	client.say("#{{ username }}", "!comfy");
+					// 	ComfyJS.Say( "!comfy");
 					// },
 					// 'boing boing': function() {
 					// 	shermanSays("Okay.");
-					// 	client.say("#{{ username }}", "!boingboing");
+					// 	ComfyJS.Say( "!boingboing");
 					// },
 					'holy cram': function() {
 						shermanSays("Holy cows live in India");
@@ -361,42 +362,14 @@
 				});
 			}
 
-			var options = {
-				options: {
-					debug: false
-				},
-				connection: {
-					reconnect: true,
-				},
-				identity: {
-					username: "{{ username }}",
-				    password: "{{ oauth }}"
-				},
-				channels: ["#{{ username }}"]
-			};
-
-			client = new tmi.client(options);
-
-			// Connect the client to the server..
-			client.connect();
-
-			client.on("chat", function (channel, userstate, message, self) {
-				// if( ( userstate[ "badges" ] && ( userstate[ "badges" ][ "vip" ] || userstate[ "badges" ][ "moderator" ] ) ) && message.startsWith( "!speak " ) ) {
-				if( message.startsWith( "!speak " ) ) {
-					shermanSays( message.replace( "!speak ", "" ).substring(0, 100) );
+			ComfyJS.onChat = ( user, message, flags, self, extra ) => {
+				console.log( flags, message, extra );
+				if( flags.customReward &&
+				 		extra.customRewardId === "cb9ac8d4-1104-467b-b44d-5e497402d492" ) {
+					shermanSays( message.substring(0, 100) );
 				}
-
-				// if( message.startsWith( "!weather " ) ) {
-				// 	var cityName = message.replace( "!weather ", "" );
-				// 	$.ajax({
-				// 		url: "https://api.openweathermap.org/data/2.5/weather?q=" + cityName + "&appid=" + openweatherkey,
-				// 		success: (result) => {
-				// 			shermanSays( "The weather in " + result[ "name" ] + " is " + result[ "weather" ][0].description );
-				// 			console.log( result );
-				// 		}
-				// 	});
-				// }
-			});
+			};
+			ComfyJS.Init( "{{ username }}", "{{ oauth }}" );
 		});
 	</script>
 {% endblock %}
