@@ -80,7 +80,7 @@
 			msg.volume = 0.75; // 0 to 1
 			msg.rate = 1; // 0.1 to 10
 			msg.pitch = 1; //0 to 2
-			msg.text = message.replace(/[^\w\s]/gi, '');
+			msg.text = message.replace(/[^\w\s\.]/gi, '');
 			msg.lang = 'en-US';
 
 			if( !isSpeaking ) {
