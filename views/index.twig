@@ -86,7 +86,7 @@
 			if( !isSpeaking ) {
 				isSpeaking = true;
 				// speechSynthesis.speak(msg);
-				speechUtteranceChunker(msg, { chunkLength:180 }, function(){
+				speechUtteranceChunker(msg, { chunkLength:40 }, function(){
 					//some code to execute when done
 					console.log('done');
 					isSpeaking = false;
