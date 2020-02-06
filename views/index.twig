@@ -362,11 +362,17 @@
 				});
 			}
 
+			ComfyJS.onCommand = ( user, command, message, flags, extra ) => {
+				if( command === "speak" && ( flags.broadcaster || flags.mod || flags.vip ) ) {
+					shermanSays( message );
+				}
+			};
+
 			ComfyJS.onChat = ( user, message, flags, self, extra ) => {
 				console.log( flags, message, extra );
 				if( flags.customReward &&
 				 		extra.customRewardId === "cb9ac8d4-1104-467b-b44d-5e497402d492" ) {
-					shermanSays( message.substring(0, 100) );
+					shermanSays( message );
 				}
 			};
 			ComfyJS.Init( "{{ username }}", "{{ oauth }}" );
