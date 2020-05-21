@@ -2,6 +2,9 @@
 Voice Commands! P Sherman 42 Wallaby Way, Sydney
 We built this voice command bot live on Twitch!
 
+## Who drew Sherman? ##
+Sherman was drawn by my friend, the amazing VR Artist TheSabbyLife! Check out her incredible VR artistry on her [YouTube Channel](https://www.youtube.com/channel/UCPZljvp-eEhbvOcoQGIv5Cg)!
+
 ## Instafluff ##
 > *Like these projects? The best way to support my open-source projects is by becoming a Comfy Sponsor on GitHub!*
 
